@@ -57,7 +57,12 @@ jobs:
           log-accepted-android-sdk-licenses: false
 
       - name: Test and build release APK
-        run: ./gradlew :core:test :app:testDebugUnitTest :app:assembleRelease --no-daemon --console=plain
+        # Keep one compiler in the Gradle process; hosted runners stalled with concurrent compiler daemons.
+        run: >-
+          ./gradlew :core:test :app:testReleaseUnitTest :app:assembleRelease
+          --no-daemon --console=plain --stacktrace --max-workers=1
+          -Pkotlin.compiler.execution.strategy=in-process
+          -Dorg.gradle.jvmargs="-Xmx4g -Dfile.encoding=UTF-8"
 
       - name: Check built version and sign APK
         env:
