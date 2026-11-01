@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="logs_title">Session logs</string>
+    <string name="logs_subtitle">Choose a conversation and export its task logs</string>
+    <string name="logs_content">Select a conversation to save a ZIP containing its retained task logs: tool arguments, system commands and results, timing, and screenshots.</string>
+    <string name="logs_session_detail">%1$d tasks · %2$s\n%3$s</string>
+    <string name="logs_empty">No saved session logs yet</string>
+    <string name="logs_read_failed">Could not read session logs. Go back and try again.</string>
+    <string name="logs_export">Export selected session</string>
+    <string name="logs_exporting">Exporting…</string>
+    <string name="logs_exported">Session logs exported</string>
+    <string name="logs_export_failed">Could not export logs. Check available storage and try again.</string>
+    <string name="logs_running">This conversation has a running task. Export after it finishes.</string>
+    <string name="logs_privacy">Password-field input and recognised credentials are masked. Exports can still contain private conversation and page content. Share them carefully.</string>
+    <string name="logs_retention">Only the latest 30 runs are retained. Previously masked content cannot be recovered.</string>
+</resources>

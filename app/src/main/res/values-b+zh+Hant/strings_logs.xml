@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="logs_title">對話日誌</string>
+    <string name="logs_subtitle">選擇聊天對話，匯出其中各次任務的日誌</string>
+    <string name="logs_content">選擇一個聊天對話，將仍保留的任務日誌儲存為 ZIP，包含工具參數、系統命令及傳回結果、耗時和畫面截圖。</string>
+    <string name="logs_session_detail">%1$d 次任務 · %2$s\n%3$s</string>
+    <string name="logs_empty">還沒有已儲存的對話日誌</string>
+    <string name="logs_read_failed">讀取對話日誌失敗，請返回後重試。</string>
+    <string name="logs_export">匯出所選對話</string>
+    <string name="logs_exporting">正在匯出…</string>
+    <string name="logs_exported">對話日誌已匯出</string>
+    <string name="logs_export_failed">日誌匯出失敗，請檢查儲存空間後重試。</string>
+    <string name="logs_running">此對話有任務正在執行，請結束後再匯出。</string>
+    <string name="logs_privacy">密碼欄輸入和可識別的憑據會遮蔽。匯出檔案仍可能包含私人聊天及網頁內容，請謹慎分享。</string>
+    <string name="logs_retention">僅保留最近 30 次執行。舊日誌中已經隱藏的內容無法恢復。</string>
+</resources>

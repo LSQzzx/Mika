@@ -26,7 +26,11 @@ object Redactor {
     fun args(verb: Verb?, argsJson: String, secretField: Boolean): String {
         if (verb == Verb.MemorySave) return maskFields(argsJson, MEMORY_ARGS)
         if (verb == Verb.Script) return script(argsJson)
-        if (verb == Verb.PhoneCommand) return maskFields(argsJson, setOf("command"))
+        if (verb == Verb.PhoneCommand) {
+            val args = try { Json.parseToJsonElement(argsJson) as? JsonObject } catch (e: SerializationException) { null } ?: return MASK
+            val command = (args["command"] as? JsonPrimitive)?.content ?: return text(argsJson)
+            return text(JsonObject(args + ("command" to JsonPrimitive(commandText(command)))).toString())
+        }
         if (verb == Verb.PhoneRun) return phoneRun(argsJson)
         if (verb != Verb.TypeText || !secretField) return text(argsJson)
         val o = try {
@@ -75,9 +79,22 @@ object Redactor {
             })))
         } ?: content
         Verb.HandToUser -> if ("userNote" in content) JsonObject(content + ("userNote" to JsonPrimitive(MASK))) else content
-        Verb.PhoneCommand -> if ("output" in content) JsonObject(content + ("output" to JsonPrimitive(MASK))) else content
+        Verb.PhoneCommand -> (content["output"] as? JsonPrimitive)?.let {
+            JsonObject(content + ("output" to JsonPrimitive(commandText(it.content))))
+        } ?: content
         else -> content
     }
+
+    /** 保留系统命令与诊断输出，输入载荷和可识别凭据仍不落盘。 */
+    private fun commandText(value: String): String {
+        val withoutInput = SHELL_INPUT.replace(text(value)) { it.groupValues[1] + MASK }
+        val withoutCredentials = COMMAND_CREDENTIAL.replace(withoutInput) { it.groupValues[1] + MASK }
+        return evidence(pageData(withoutCredentials))
+    }
+
+    // shortcut: 识别具名凭据与 input text；支持更多携带凭据的输入命令时补充脱敏规则。
+    private val SHELL_INPUT = Regex("""(\binput\b[^;\n|&]*?\btext\s+)("(?:\\.|[^"\\])*"|'[^']*'|[^\s;&|]+)""")
+    private val COMMAND_CREDENTIAL = Regex("""(?i)(\b(?:api[-_]?key|access[-_]?token|refresh[-_]?token|client[-_]?secret|password|passwd|pwd|passcode|token|secret|authorization|cookie|pin)\b\s*(?:[=:]\s*|\s+))("(?:\\.|[^"\\])*"|'[^']*'|[^\s;&|]+)""")
 
     private fun maskFields(argsJson: String, fields: Set<String>): String {
         val o = try {

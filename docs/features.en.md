@@ -66,6 +66,7 @@ The apps and websites that already have usage knowledge are listed in the collap
 ## Everything is traceable
 
 - Answers list their sources (pages read, screenshots), and every task has a step-by-step record you can review.
+- Settings › Session logs lets you export a conversation's retained task logs and screenshots as a ZIP. System commands and results keep diagnostic details, while password-field input and recognised credentials remain masked. Previously masked content cannot be recovered.
 - Each task ends with a one-line summary: total time, model round trips, tokens used, and time to first feedback. "Token usage" (Token 用量) in Settings breaks usage down by day, provider and model.
 
 ## Linux sandbox

@@ -233,7 +233,7 @@ class PhoneAutomationToolsTest {
         val cmd = PhoneCommand.execute(Args(PhoneCommand.def, Json.parseToJsonElement("""{"command":"pm list packages"}""").jsonObject), dispatcher.ctx)
         assertEquals("pm list packages", command)
         assertTrue(cmd.content["output"]!!.jsonPrimitive.content.contains("shell"))
-        assertFalse(Redactor.args(Verb.PhoneCommand, """{"command":"echo private"}""", false).contains("private"))
+        assertTrue(Redactor.args(Verb.PhoneCommand, """{"command":"pm list packages"}""", false).contains("pm list packages"))
     }
 
     @Test fun gestureConvertsTwoFingerPathsToPixels() = runTest {

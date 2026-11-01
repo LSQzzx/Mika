@@ -10,6 +10,9 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.io.ByteArrayOutputStream
+import java.nio.file.Files
+import java.util.zip.ZipInputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -19,6 +22,44 @@ class RunStoreTest {
     private var clock = 1_760_000_000_000L
     private fun store(keep: Int = 30, external: File? = null, encode: (ByteArray) -> ByteArray? = { png -> png + byteArrayOf(9) }) =
         RunStore(tmp.root.resolve("files"), { external }, keep, { clock }, encode)
+
+    @Test fun exportsOnlySelectedRunsAndScreens() {
+        val s = store()
+        val chosen = s.open("selected").also {
+            it.event(RunEvent.TaskStarted(clock, "selected", "m"))
+            it.media(1, byteArrayOf(1)); it.close()
+        }
+        s.open("other").close()
+        tmp.root.resolve("files/runs/${chosen.runId}/provider-keys.json").writeText("private")
+        val output = ByteArrayOutputStream()
+        s.export(listOf(chosen.runId, chosen.runId), output)
+        val entries = mutableMapOf<String, ByteArray>()
+        ZipInputStream(output.toByteArray().inputStream()).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                entries[entry.name] = zip.readBytes()
+            }
+        }
+        assertEquals(setOf("${chosen.runId}/run.json", "${chosen.runId}/events.jsonl", "${chosen.runId}/screens/0001.jpg"), entries.keys)
+        assertTrue(entries.getValue("${chosen.runId}/events.jsonl").decodeToString().contains("task_started"))
+        assertArrayEquals(byteArrayOf(1, 9), entries.getValue("${chosen.runId}/screens/0001.jpg"))
+    }
+
+    @Test fun exportRejectsInvalidMissingAndLinkedRuns() {
+        val s = store()
+        val files = tmp.root.resolve("files/runs").apply { mkdirs() }
+        val linkedId = "20261101-120000-aaaaaa"
+        Files.createSymbolicLink(File(files, linkedId).toPath(), tmp.newFolder("private").toPath())
+        for (ids in listOf(emptyList(), listOf("../settings"), listOf("20261101-120000-bbbbbb"), listOf(linkedId))) {
+            val output = ByteArrayOutputStream()
+            try {
+                s.export(ids, output)
+                throw AssertionError("Expected export rejection: $ids")
+            } catch (_: IllegalArgumentException) {
+                assertEquals(0, output.size())
+            }
+        }
+    }
 
     @Test fun writesRunJsonEventsAndScreens() {
         val s = store()

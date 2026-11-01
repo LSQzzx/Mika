@@ -33,6 +33,23 @@ private fun call(name: String, args: String = "{}") = Part.ToolCall("r${++seq}",
 private fun reply(vararg parts: Part, usage: Usage? = null) = ModelReply(parts.toList(), StopReason.ToolUse, usage)
 
 class AgentLoopRecordTest {
+    @Test fun systemCommandArgumentsAndResultsReachTheSavedRunLog() {
+        val screen = object : ScreenPort by FakeScreen() {
+            override suspend fun systemCommand(command: String) =
+                com.wangzan101.mika.core.uistate.SystemCommandResult(0, "displayId=7; token=hunter2")
+        }
+        val model = FakeModel(
+            reply(call("phone_system_command", """{"command":"dumpsys activity activities","reason":"inspect task"}""")),
+            com.wangzan101.mika.core.testing.answerReply("checked"),
+        )
+        val events = run(model, screen).events
+        val args = events.filterIsInstance<RunEvent.ModelReply>().first().argsJson!!
+        assertTrue(args, "dumpsys activity activities" in args)
+        val result = events.filterIsInstance<RunEvent.ToolResult>().first().resultJson
+        assertTrue(result, "displayId=7" in result)
+        assertFalse(result, "hunter2" in result)
+    }
+
     private fun run(model: FakeModel, screen: ScreenPort = FakeScreen(), vision: Boolean = false, frames: Boolean = false, goal: String = "帮我查", inline: Boolean = false): ListSink {
         val sink = ListSink()
         kotlinx.coroutines.runBlocking {

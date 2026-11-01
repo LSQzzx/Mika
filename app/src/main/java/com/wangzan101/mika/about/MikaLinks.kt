@@ -4,10 +4,10 @@ import com.wangzan101.mika.R
 import com.wangzan101.mika.i18n.tr
 import java.net.URLEncoder
 
-/** Mika 对外的地址都在这里:仓库、问题、作者、X 群聊、检查更新用的两个来源。换地址只改这一处。 */
+/** Mika 对外的地址都在这里:仓库、问题、作者、X 群聊和检查更新。换地址只改这一处。 */
 object MikaLinks {
-    const val REPO = "https://github.com/wangzan101/Mika"
-    const val REPO_LABEL = "github.com/wangzan101/Mika"
+    const val REPO = "https://github.com/LSQzzx/Mika"
+    const val REPO_LABEL = "github.com/LSQzzx/Mika"
     const val README = "$REPO#readme"
     const val RELEASES = "$REPO/releases"
     const val NEW_ISSUE = "$REPO/issues/new"
@@ -18,7 +18,7 @@ object MikaLinks {
     const val X_GROUP = "https://x.com/i/chat/group_join/g2116500883139862983/xP74Qyff3X"
 
     /** 检查更新只问 GitHub 发布页(不登录,每小时有次数限制)。 */
-    const val LATEST_RELEASE_API = "https://api.github.com/repos/wangzan101/Mika/releases/latest"
+    const val LATEST_RELEASE_API = "https://api.github.com/repos/LSQzzx/Mika/releases/latest"
 
     /** 反馈时预先填进问题模板的设备与版本信息。 */
     data class Device(

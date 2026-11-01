@@ -3,6 +3,9 @@ package com.wangzan101.mika.core.record
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import com.wangzan101.mika.core.tool.Verb
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -10,6 +13,34 @@ import org.junit.Test
 import com.wangzan101.mika.core.testing.verb
 
 class RedactorTest {
+    @Test fun systemCommandsAndTheirOutputsRemainAuditable() {
+        val command = "dumpsys activity activities; am start --display 7 -n com.example/.Main"
+        val args = buildJsonObject { put("command", command); put("reason", "inspect activity") }.toString()
+        val saved = Json.parseToJsonElement(Redactor.args(Verb.PhoneCommand, args, true)).jsonObject
+        assertEquals(command, saved["command"]!!.jsonPrimitive.content)
+        val result = Redactor.result(Verb.PhoneCommand, buildJsonObject { put("exitCode", 0); put("output", "displayId=7\ncom.example/.Main") })
+        assertEquals("displayId=7\ncom.example/.Main", result["output"]!!.jsonPrimitive.content)
+        assertEquals("0", result["exitCode"]!!.jsonPrimitive.content)
+    }
+
+    @Test fun commandDetailsStillMaskCredentialsAndInputPayloads() {
+        for (command in listOf(
+            "TOKEN='hunter two' sh job.sh", "curl --password hunter2 https://a.test",
+            "input -d 7 text 'hunter two'", "input touchscreen -d 7 text hunter2",
+            "curl -H 'Authorization: Bearer abc.DEF-123_xyz' https://a.test",
+        )) {
+            val args = buildJsonObject { put("command", command) }.toString()
+            val saved = Redactor.args(Verb.PhoneCommand, args, false)
+            for (secret in listOf("hunter two", "hunter2", "abc.DEF-123_xyz")) assertFalse(saved, secret in saved)
+            assertTrue(saved, "***" in saved)
+        }
+        val result = Redactor.result(Verb.PhoneCommand, buildJsonObject {
+            put("output", """{"password":"hunter2","pid":1234}""")
+        })
+        assertFalse(result.toString().contains("hunter2"))
+        assertTrue(result.toString().contains("1234"))
+    }
+
     /** Google 新格式的认证 Key(AQ. 开头)和旧的 AIza 一样,经 Redactor 的每条路都遮住。 */
     @Test fun googleAuthKeyMaskedEverywhere() {
         val key = "AQ." + "Ab8RN6Lq_x-Zt3VwP0kJ9sYcH2mE4uFgD7aB"

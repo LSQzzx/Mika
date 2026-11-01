@@ -130,6 +130,7 @@ class UpdateChecker(
         if (loaded) return
         loaded = true
         val o = runCatching { Json.parseToJsonElement(file.readText()).jsonObject }.getOrNull() ?: return
+        if ((o["source"] as? JsonPrimitive)?.content != releaseApi) return
         lastAttempt = (o["lastAttempt"] as? JsonPrimitive)?.longOrNull
         val latest = (o["latest"] as? JsonObject)?.let(Releases::fromJson)
         _state.update { it.withLatest(latest) }
@@ -137,6 +138,7 @@ class UpdateChecker(
 
     private fun save() {
         val o = buildJsonObject {
+            put("source", releaseApi)
             lastAttempt?.let { put("lastAttempt", it) }
             _state.value.latest?.let { put("latest", Releases.toJson(it)) }
         }
@@ -152,7 +154,7 @@ class UpdateChecker(
     }
 
     companion object {
-        /** 有的网络连 GitHub 时快时慢:超时放短,失败就换备用来源。 */
+        /** 有的网络连 GitHub 时快时慢:超时放短,失败等下次检查。 */
         fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
             .connectTimeout(5, TimeUnit.SECONDS)
             .readTimeout(8, TimeUnit.SECONDS)

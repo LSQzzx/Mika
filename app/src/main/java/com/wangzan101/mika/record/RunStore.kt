@@ -13,10 +13,15 @@ import com.wangzan101.mika.core.record.RunSummary
 import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.io.File
+import java.io.OutputStream
+import java.nio.file.Files
+import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.random.Random
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 private const val TAG = "RunStore"
 private const val MAX_WIDTH = 720
@@ -106,9 +111,28 @@ class RunStore internal constructor(
             .getOrDefault(false)
     }
 
+    /** 只导出选中的运行及其截图，不包含设置、密钥或工作区文件。 */
+    fun export(runIds: List<String>, output: OutputStream) {
+        require(runIds.isNotEmpty()) { "No runs selected" }
+        val dirs = runIds.distinct().map { requireNotNull(dirOf(it)) { "Run record is unavailable: $it" } }
+        ZipOutputStream(output).use { zip ->
+            for (dir in dirs) {
+                val logs = listOf(File(dir, RUN_JSON), File(dir, EVENTS))
+                require(logs.all { Files.isRegularFile(it.toPath(), NOFOLLOW_LINKS) }) { "Run log is incomplete" }
+                val screens = File(dir, "screens").takeIf { Files.isDirectory(it.toPath(), NOFOLLOW_LINKS) }
+                    ?.listFiles().orEmpty().filter { it.name.matches(Regex("[0-9]+\\.jpg")) && Files.isRegularFile(it.toPath(), NOFOLLOW_LINKS) }
+                for (file in logs + screens.sortedBy { it.name }) {
+                    zip.putNextEntry(ZipEntry("${dir.name}/${file.relativeTo(dir).invariantSeparatorsPath}"))
+                    file.inputStream().use { it.copyTo(zip) }
+                    zip.closeEntry()
+                }
+            }
+        }
+    }
+
     /** 只接受本目录下真实存在的运行,防止拼出别的路径。 */
     private fun dirOf(runId: String): File? =
-        File(root, runId).takeIf { ID_RE.matches(runId) && it.isDirectory }
+        File(root, runId).takeIf { ID_RE.matches(runId) && Files.isDirectory(it.toPath(), NOFOLLOW_LINKS) }
 
     private fun runDirs(): List<File> = dirsIn(root)
 

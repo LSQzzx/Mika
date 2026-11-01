@@ -131,6 +131,17 @@ class UpdateCheckerTest {
         assertNotNull(upgraded.state.value.latest)
     }
 
+    @Test fun changingRepositoryDiscardsOldCachedUpdates() = runTest {
+        github = release("v0.2.0")
+        checker().autoCheck()
+        val fork = UpdateChecker(tmp.root.resolve("update.json"), "0.1.0", releaseApi = server.url("/fork").toString())
+        fork.load()
+        assertNull(fork.state.value.latest)
+        assertNull(fork.state.value.update)
+        fork.autoCheck()
+        assertEquals(listOf("/api", "/fork"), hits)
+    }
+
     /** 同时进来的两次自动检查(查还没完)只真的查一次;隔十分钟再打开照样查。 */
     @Test
     fun concurrentAutoChecksHitGitHubOnce() = runTest {
