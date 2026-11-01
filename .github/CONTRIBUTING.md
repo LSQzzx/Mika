@@ -57,5 +57,6 @@ The developer docs index and reading order are in [`docs/dev/README.en.md`](../d
 ### Releases and updates (maintainers)
 
 - Releases are published on GitHub Releases with tags `vX.Y.Z`, with the APK attached to the release.
-- Update checks: each time you open the app it queries `https://api.github.com/repos/wangzan101/Mika/releases/latest` and no other address.
+- This fork can build and publish on a `[release]` commit message. See the [release workflow guide](../docs/dev/github-release.md) for signing and version rules.
+- Update checks: each time you open the app it queries `https://api.github.com/repos/LSQzzx/Mika/releases/latest` and no other address.
 - After you tap "Download update" on the About page, the system download service fetches the APK in the background; you can watch progress, delete the download or retry after a failure, and it is still there after reopening the app. When it finishes, tap "Install update", allow Mika to install unknown apps the first time, then confirm on the system installer. Before installing, Mika checks the APK size, the SHA-256 published with the release asset, the package name, the version and the signing certificate, and the system installer verifies the signature again; a build you compiled and signed yourself cannot be installed over the official one without uninstalling first. If a release has no APK, the release page is opened instead.

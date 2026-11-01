@@ -1,0 +1,117 @@
+name: Android release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: contains(github.event.head_commit.message, '[release]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check release version
+        id: version
+        run: |
+          python3 -m unittest discover -s tools/release -v
+          python3 tools/release/check_version.py >> "$GITHUB_OUTPUT"
+
+      - name: Reject an already published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if draft=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null); then
+            if [[ "$draft" != true ]]; then
+              echo "::error::Release $TAG is already published; increase the version."
+              exit 1
+            fi
+          fi
+
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+        with:
+          packages: 'platforms;android-36 build-tools;36.0.0'
+          log-accepted-android-sdk-licenses: false
+
+      - name: Test and build release APK
+        run: ./gradlew :core:test :app:testDebugUnitTest :app:assembleRelease --no-daemon --console=plain
+
+      - name: Check built version and sign APK
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
+          TAG: ${{ steps.version.outputs.tag }}
+          KEYSTORE_BASE64: ${{ secrets.MIKA_RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.MIKA_RELEASE_KEYSTORE_PASSWORD }}
+        run: |
+          : "${KEYSTORE_BASE64:?Set MIKA_RELEASE_KEYSTORE_BASE64 in Actions secrets}"
+          : "${KEYSTORE_PASSWORD:?Set MIKA_RELEASE_KEYSTORE_PASSWORD in Actions secrets}"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          metadata = json.loads(Path('app/build/outputs/apk/release/output-metadata.json').read_text())
+          elements = metadata['elements']
+          if len(elements) != 1 or elements[0]['versionName'] != os.environ['VERSION'] or elements[0]['versionCode'] != int(os.environ['VERSION_CODE']):
+              raise SystemExit('Built APK version does not match the release version')
+          if elements[0]['outputFile'] != 'app-release-unsigned.apk':
+              raise SystemExit('Unexpected release APK output')
+          PY
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/mika-release.p12"
+          unset KEYSTORE_BASE64
+          tools="$ANDROID_HOME/build-tools/36.0.0"
+          mkdir -p release
+          "$tools/zipalign" -P 16 -f 4 app/build/outputs/apk/release/app-release-unsigned.apk "$RUNNER_TEMP/mika-aligned.apk"
+          "$tools/apksigner" sign --ks "$RUNNER_TEMP/mika-release.p12" --ks-key-alias mika-local-release \
+            --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEYSTORE_PASSWORD \
+            --out "release/Mika-$TAG.apk" "$RUNNER_TEMP/mika-aligned.apk"
+          "$tools/apksigner" verify --verbose --print-certs "release/Mika-$TAG.apk" | tee "$RUNNER_TEMP/mika-signature.txt"
+          grep -Fq 'Signer #1 certificate SHA-256 digest: bc101a5988af967272eae79c02101ee9fdee7f446355a4e996b8254855e52e76' "$RUNNER_TEMP/mika-signature.txt"
+          "$tools/zipalign" -c -P 16 4 "release/Mika-$TAG.apk"
+          cd release
+          sha256sum "Mika-$TAG.apk" > "Mika-$TAG.apk.sha256"
+
+      - name: Upload assets and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if draft=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null); then
+            if [[ "$draft" != true ]]; then
+              echo "::error::Refusing to replace published release $TAG."
+              exit 1
+            fi
+            gh release upload "$TAG" "release/Mika-$TAG.apk" "release/Mika-$TAG.apk.sha256" --clobber
+          else
+            gh release create "$TAG" "release/Mika-$TAG.apk" "release/Mika-$TAG.apk.sha256" \
+              --target "$GITHUB_SHA" --title "Mika $VERSION" --generate-notes --draft
+          fi
+          gh release edit "$TAG" --target "$GITHUB_SHA" --draft=false --latest
+
+      - name: Remove signing files
+        if: always()
+        run: rm -f "$RUNNER_TEMP/mika-release.p12" "$RUNNER_TEMP/mika-aligned.apk"
